@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bob Sorteador</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background-color: #0F1219;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(249,215,28,.05) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(0,150,255,.05) 0%, transparent 40%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      overflow-x: hidden;
+    }
+
+    .layout {
+      width: 100%;
+      max-width: 900px;
+      min-height: 600px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .layout { grid-template-columns: 1fr 350px; }
+    }
+
+    /* ── MAIN CARD ── */
+    .main-card {
+      position: relative;
+      background: rgba(255,255,255,.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 32px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(0,0,0,.4);
+    }
+
+    @media (min-width: 768px) { .main-card { padding: 3rem; } }
+
+    .bubble-1, .bubble-2 {
+      position: absolute;
+      border: 2px solid rgba(255,255,255,.1);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .bubble-1 { width: 150px; height: 150px; right: 20px; top: 40px; }
+    .bubble-2 { width: 80px;  height: 80px;  right: 185px; top: 125px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      background: #F9D71C;
+      color: #0F1219;
+      padding: .375rem 1rem;
+      border-radius: 9999px;
+      font-size: .75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 1.5rem;
+    }
+
+    .episode-area {
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .episode-meta {
+      font-size: 1rem;
+      color: #F9D71C;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .15em;
+      margin-bottom: .5rem;
+    }
+
+    .episode-title {
+      font-size: clamp(2rem, 5vw, 4rem);
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      max-width: 500px;
+    }
+
+    .empty-msg {
+      color: rgba(255,255,255,.6);
+      font-size: 1.125rem;
+    }
+
+    /* fade-in animation */
+    @keyframes fadeZoom {
+      from { opacity: 0; transform: scale(.96); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .animate-in { animation: fadeZoom .3s ease forwards; }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .75rem;
+      padding: 1rem 2rem;
+      border-radius: 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: background .15s, opacity .15s;
+      box-shadow: 0 4px 12px rgba(0,0,0,.3);
+    }
+
+    .btn-primary { background: #F9D71C; color: #0F1219; }
+    .btn-primary:hover { background: #e5c518; }
+
+    .btn-secondary { background: #fff; color: #0F1219; }
+    .btn-secondary:hover { background: #e5e5e5; }
+
+    /* ── SIDEBAR ── */
+    .sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
+
+    .panel {
+      background: rgba(255,255,255,.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 24px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    }
+
+    .panel-title {
+      font-size: .75rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.6);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 1rem;
+    }
+
+    .history-list { list-style: none; display: flex; flex-direction: column; }
+
+    .history-item {
+      padding: .75rem 0;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+    .history-item:last-child { border-bottom: none; }
+
+    .history-item-title { font-size: .9375rem; font-weight: 500; }
+    .history-item-meta  { font-size: .75rem; color: rgba(255,255,255,.6); }
+
+    .empty-history { font-size: .875rem; color: rgba(255,255,255,.4); font-style: italic; padding: .75rem 0; }
+
+    .total-count {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    .total-count span { font-size: .875rem; font-weight: 400; color: rgba(255,255,255,.6); }
+
+    /* SVG icons */
+    svg { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Main Card -->
+  <div class="main-card">
+    <div class="bubble-1"></div>
+    <div class="bubble-2"></div>
+
+    <div style="position:relative;z-index:1">
+      <div class="badge">
+        <!-- TV icon -->
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>
+        </svg>
+        Bob Sorteador
+      </div>
+
+      <div class="episode-area" id="episodeArea">
+        <p class="empty-msg">Pressione o botão para sortear um episódio!</p>
+      </div>
+    </div>
+
+    <div style="position:relative;z-index:1">
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="pickRandom()">
+          <!-- Shuffle icon -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+            <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+          </svg>
+          SORTEAR PRÓXIMO
+        </button>
+        <a id="watchBtn" class="btn btn-secondary" target="_blank" rel="noopener noreferrer" style="display:none">
+          <!-- Film icon -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><line x1="7" y1="2" x2="7" y2="22"/>
+            <line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>
+            <line x1="2" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="22" y2="7"/>
+            <line x1="17" y1="17" x2="22" y2="17"/><line x1="2" y1="17" x2="7" y2="17"/>
+          </svg>
+          ASSISTIR AGORA
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="panel" style="flex:1">
+      <p class="panel-title">Vistos Recentemente</p>
+      <ul class="history-list" id="historyList">
+        <li class="empty-history">Nenhum episódio sorteado ainda.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <p class="panel-title">Total na Lista</p>
+      <div class="total-count" id="totalCount">
+        0 <span>Episódios</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const episodes = [
+  { season: "1ª Temporada", episode: "Episódio 01", title: "Precisa-se de Atendente", link: "https://redecanais.ph/watch.php?vid=b93338dee" },
+  { season: "1ª Temporada", episode: "Episódio 02", title: "Assoprador de Arrecifes", link: "https://redecanais.ph/watch.php?vid=7814ba7d3" },
+  { season: "1ª Temporada", episode: "Episódio 03", title: "Chá em Terra Firme", link: "https://redecanais.ph/watch.php?vid=359fac727" },
+  { season: "1ª Temporada", episode: "Episódio 04", title: "Bolhas de Sabão", link: "https://redecanais.ph/watch.php?vid=a2ebfccf5" },
+  { season: "1ª Temporada", episode: "Episódio 05", title: "Calças Rasgadas", link: "https://redecanais.ph/watch.php?vid=f9252b013" },
+  { season: "1ª Temporada", episode: "Episódio 06", title: "Caçando Águas Vivas", link: "https://redecanais.ph/watch.php?vid=6431ead31" },
+  { season: "1ª Temporada", episode: "Episódio 07", title: "Plankton!", link: "https://redecanais.ph/watch.php?vid=69d763433" },
+  { season: "1ª Temporada", episode: "Episódio 08", title: "Vizinhos Náuticos Terríveis", link: "https://redecanais.ph/watch.php?vid=a8d699763" },
+  { season: "1ª Temporada", episode: "Episódio 09", title: "Escola de Pilotagem", link: "https://redecanais.ph/watch.php?vid=d5d9da380" },
+  { season: "1ª Temporada", episode: "Episódio 10", title: "Entrega de Pizza", link: "https://redecanais.ph/watch.php?vid=7d62d8a3d" },
+  { season: "1ª Temporada", episode: "Episódio 11", title: "Lar Doce Abacaxi", link: "https://redecanais.ph/watch.php?vid=0e6e30961" },
+  { season: "1ª Temporada", episode: "Episódio 12", title: "Homem Sereia e o Mexilhãozinho", link: "https://redecanais.ph/watch.php?vid=9e7b2d951" },
+  { season: "1ª Temporada", episode: "Episódio 13", title: "Picles", link: "https://redecanais.ph/watch.php?vid=7bfbdf75a" },
+  { season: "1ª Temporada", episode: "Episódio 14", title: "Monitor da Classe", link: "https://redecanais.ph/watch.php?vid=6adb0b475" },
+  { season: "1ª Temporada", episode: "Episódio 15", title: "Festa das Águas Vivas", link: "https://redecanais.ph/watch.php?vid=a35624563" },
+  { season: "1ª Temporada", episode: "Episódio 16", title: "O Foguete da Sandy", link: "https://redecanais.ph/watch.php?vid=a50e29c19" },
+  { season: "1ª Temporada", episode: "Episódio 17", title: "Botas que rangem", link: "https://redecanais.ph/watch.php?vid=8a73991a4" },
+  { season: "1ª Temporada", episode: "Episódio 18", title: "Com Calças Naturais", link: "https://redecanais.ph/watch.php?vid=98f13dd7a" },
+  { season: "1ª Temporada", episode: "Episódio 19", title: "O Dia do Contra", link: "https://redecanais.ph/watch.php?vid=2c2bd5bcc" },
+  { season: "1ª Temporada", episode: "Episódio 20", title: "Choque Cultural", link: "https://redecanais.ph/watch.php?vid=695f8dd69" },
+  { season: "1ª Temporada", episode: "Episódio 21", title: "Diversão", link: "https://redecanais.ph/watch.php?vid=0264dac1d" },
+  { season: "1ª Temporada", episode: "Episódio 22", title: "Bob Músculo Calcas Cheias", link: "https://redecanais.ph/watch.php?vid=3462db777" },
+  { season: "1ª Temporada", episode: "Episódio 23", title: "Lula Molusco o Fantasma Abusado", link: "https://redecanais.ph/watch.php?vid=e524b963a" },
+  { season: "1ª Temporada", episode: "Episódio 24", title: "O Acompanhante", link: "https://redecanais.ph/watch.php?vid=384589734" },
+  { season: "1ª Temporada", episode: "Episódio 25", title: "O Funcionário do Mês", link: "https://redecanais.ph/watch.php?vid=4a40f075c" },
+  { season: "1ª Temporada", episode: "Episódio 26", title: "Bob Medroso", link: "https://redecanais.ph/watch.php?vid=c78920d84" },
+  { season: "1ª Temporada", episode: "Episódio 27", title: "Torne-me um Gary Adolescente", link: "https://redecanais.ph/watch.php?vid=836c916f5" },
+  { season: "1ª Temporada", episode: "Episódio 28", title: "SB-129", link: "https://redecanais.ph/watch.php?vid=d8d0593ed" },
+  { season: "1ª Temporada", episode: "Episódio 29", title: "Karatecas Batalhadores", link: "https://redecanais.ph/watch.php?vid=448848fcf" },
+  { season: "1ª Temporada", episode: "Episódio 30", title: "Hora do Sono", link: "https://redecanais.ph/watch.php?vid=10106e718" },
+  { season: "1ª Temporada", episode: "Episódio 31", title: "Espuma", link: "https://redecanais.ph/watch.php?vid=f73642838" },
+  { season: "1ª Temporada", episode: "Episódio 32", title: "Dia de São Valentim", link: "https://redecanais.ph/watch.php?vid=f0e5f4a78" },
+  { season: "1ª Temporada", episode: "Episódio 33", title: "O Papel", link: "https://redecanais.ph/watch.php?vid=10e51436d" },
+  { season: "1ª Temporada", episode: "Episódio 34", title: "Sim Capitão", link: "https://redecanais.ph/watch.php?vid=903f77f7e" },
+  { season: "1ª Temporada", episode: "Episódio 35", title: "Fenda da Pedra", link: "https://redecanais.ph/watch.php?vid=f2da1b069" },
+  { season: "1ª Temporada", episode: "Episódio 36", title: "O Texas", link: "https://redecanais.ph/watch.php?vid=8cece00d1" },
+  { season: "1ª Temporada", episode: "Episódio 37", title: "Passos Pequeninhos", link: "https://redecanais.ph/watch.php?vid=3ae108c1d" },
+  { season: "1ª Temporada", episode: "Episódio 38", title: "1ª de Abril", link: "https://redecanais.ph/watch.php?vid=17dfe2915" },
+  { season: "1ª Temporada", episode: "Episódio 39", title: "A Espátula de Netuno", link: "https://redecanais.ph/watch.php?vid=08aa01f83" },
+  { season: "1ª Temporada", episode: "Episódio 40", title: "Anzóis", link: "https://redecanais.ph/watch.php?vid=2bc3c30b9" },
+  { season: "1ª Temporada", episode: "Episódio 41", title: "O Homem Sereia e o Mexilhãozinho 2", link: "https://redecanais.ph/watch.php?vid=b833d19be" },
+  { season: "2ª Temporada", episode: "Episódio 01", title: "Sapatos Desamarrados", link: "https://redecanais.ph/watch.php?vid=5f5aba634" },
+  { season: "2ª Temporada", episode: "Episódio 02", title: "O Dia da Folga do Lula Molusco", link: "https://redecanais.ph/watch.php?vid=82c964f08" },
+  { season: "2ª Temporada", episode: "Episódio 03", title: "Está Cheirando Alguma Coisa", link: "https://redecanais.ph/watch.php?vid=f792f3eac" },
+  { season: "2ª Temporada", episode: "Episódio 04", title: "Nas Botas do Chefe", link: "https://redecanais.ph/watch.php?vid=e894227ba" },
+  { season: "2ª Temporada", episode: "Episódio 05", title: "O Grande Fracassado Cor de Rosa", link: "https://redecanais.ph/watch.php?vid=2c87914bc" },
+  { season: "2ª Temporada", episode: "Episódio 06", title: "O Amigo da Bolha", link: "https://redecanais.ph/watch.php?vid=5c7cc7993" },
+  { season: "2ª Temporada", episode: "Episódio 07", title: "Morrendo Por Uma Torta", link: "https://redecanais.ph/watch.php?vid=eb2327637" },
+  { season: "2ª Temporada", episode: "Episódio 08", title: "Imitação de Caranguejo", link: "https://redecanais.ph/watch.php?vid=8c7966e34" },
+  { season: "2ª Temporada", episode: "Episódio 09", title: "A Lagartinha", link: "https://redecanais.ph/watch.php?vid=af4fedd8b" },
+  { season: "2ª Temporada", episode: "Episódio 10", title: "Hambúrguer Decepcionante", link: "https://redecanais.ph/watch.php?vid=4e50f50b4" },
+  { season: "2ª Temporada", episode: "Episódio 11", title: "Beijos da Vovó", link: "https://redecanais.ph/watch.php?vid=4d5d787b9" },
+  { season: "2ª Temporada", episode: "Episódio 12", title: "Cidade do Lula", link: "https://redecanais.ph/watch.php?vid=a59c0e731" },
+  { season: "2ª Temporada", episode: "Episódio 13", title: "Uma Semana Antes da Hibernação", link: "https://redecanais.ph/watch.php?vid=1ba14bdf6" },
+  { season: "2ª Temporada", episode: "Episódio 14", title: "Vida de Crime", link: "https://redecanais.ph/watch.php?vid=2131b2bbf" },
+  { season: "2ª Temporada", episode: "Episódio 15", title: "Natal Que?", link: "https://redecanais.ph/watch.php?vid=ea834a5a2" },
+  { season: "2ª Temporada", episode: "Episódio 16", title: "A Sobrevivência dos Idiotas", link: "https://redecanais.ph/watch.php?vid=b72bc6dd3" },
+  { season: "2ª Temporada", episode: "Episódio 17", title: "Descartado", link: "https://redecanais.ph/watch.php?vid=b89488195" },
+  { season: "2ª Temporada", episode: "Episódio 18", title: "Pilotar, Sem Saber não Vai", link: "https://redecanais.ph/watch.php?vid=2de99d7a2" },
+  { season: "2ª Temporada", episode: "Episódio 19", title: "Sou seu Maior Fã", link: "https://redecanais.ph/watch.php?vid=0bf4ae351" },
+  { season: "2ª Temporada", episode: "Episódio 20", title: "Homem Sereia e o Mexilhãozinho 3", link: "https://redecanais.ph/watch.php?vid=4312afbff" },
+  { season: "2ª Temporada", episode: "Episódio 21", title: "Piadas de Esquilos", link: "https://redecanais.ph/watch.php?vid=3b08e8c56" },
+  { season: "2ª Temporada", episode: "Episódio 22", title: "Pressão", link: "https://redecanais.ph/watch.php?vid=55fd5c720" },
+  { season: "2ª Temporada", episode: "Episódio 23", title: "O Amendoim do Barulho", link: "https://redecanais.ph/watch.php?vid=8671cef95" },
+  { season: "2ª Temporada", episode: "Episódio 24", title: "Marujo na Marra", link: "https://redecanais.ph/watch.php?vid=1768ecb5e" },
+  { season: "2ª Temporada", episode: "Episódio 25", title: "O Banho do Gary", link: "https://redecanais.ph/watch.php?vid=0d290caa7" },
+  { season: "2ª Temporada", episode: "Episódio 26", title: "Bem Vindo ao Balde do Lixo", link: "https://redecanais.ph/watch.php?vid=f6a8ed924" },
+  { season: "2ª Temporada", episode: "Episódio 27", title: "Frankenrabisco", link: "https://redecanais.ph/watch.php?vid=97dfd396c" },
+  { season: "2ª Temporada", episode: "Episódio 28", title: "A Caixa Secreta", link: "https://redecanais.ph/watch.php?vid=6613417c9" },
+  { season: "2ª Temporada", episode: "Episódio 29", title: "Doidos Pela Banda", link: "https://redecanais.ph/watch.php?vid=e31260526" },
+  { season: "2ª Temporada", episode: "Episódio 30", title: "Turno Macabro", link: "https://redecanais.ph/watch.php?vid=0e5bb4ee2" },
+  { season: "2ª Temporada", episode: "Episódio 31", title: "Amor Cascudo", link: "https://redecanais.ph/watch.php?vid=fc6cc1b97" },
+  { season: "2ª Temporada", episode: "Episódio 32", title: "Delonga", link: "https://redecanais.ph/watch.php?vid=935b824dd" },
+  { season: "2ª Temporada", episode: "Episódio 33", title: "Sou Pelos Idiotas", link: "https://redecanais.ph/watch.php?vid=88e6b369f" },
+  { season: "2ª Temporada", episode: "Episódio 34", title: "Boca de Marinheiro", link: "https://redecanais.ph/watch.php?vid=abca834f7" },
+  { season: "2ª Temporada", episode: "Episódio 35", title: "Artista Desconhecido", link: "https://redecanais.ph/watch.php?vid=4aa583a63" },
+  { season: "2ª Temporada", episode: "Episódio 36", title: "Caçador de Águas Vivas", link: "https://redecanais.ph/watch.php?vid=bcdaf57e9" },
+  { season: "2ª Temporada", episode: "Episódio 37", title: "O Jogos do Mestre Cuca", link: "https://redecanais.ph/watch.php?vid=86ec34611" },
+  { season: "2ª Temporada", episode: "Episódio 38", title: "Lula em Greve", link: "https://redecanais.ph/watch.php?vid=d6b2ef362" },
+  { season: "2ª Temporada", episode: "Episódio 39", title: "Sandy, Bob Esponja e a Minhoca", link: "https://redecanais.ph/watch.php?vid=573348eee" },
+  { season: "3ª Temporada", episode: "Episódio 01", title: "Algas Cada vez Mais Verde", link: "https://redecanais.ph/watch.php?vid=5fc4179c1" },
+  { season: "3ª Temporada", episode: "Episódio 02", title: "Salva Vidas, Bob em Serviço", link: "https://redecanais.ph/watch.php?vid=d3da563fa" },
+  { season: "3ª Temporada", episode: "Episódio 03", title: "O Clube do Bob Esponja", link: "https://redecanais.ph/watch.php?vid=4cc0af2ac" },
+  { season: "3ª Temporada", episode: "Episódio 04", title: "O Meu Belo Cavalo Marinho", link: "https://redecanais.ph/watch.php?vid=01dafa53a" },
+  { season: "3ª Temporada", episode: "Episódio 05", title: "Só Uma Mordida", link: "https://redecanais.ph/watch.php?vid=68635c9ba" },
+  { season: "3ª Temporada", episode: "Episódio 06", title: "O Incomodo", link: "https://redecanais.ph/watch.php?vid=b7a67dc12" },
+  { season: "3ª Temporada", episode: "Episódio 07", title: "O Hambúrguer Perigoso", link: "https://redecanais.ph/watch.php?vid=7a8c7dd95" },
+  { season: "3ª Temporada", episode: "Episódio 08", title: "A Caixa Idiota", link: "https://redecanais.ph/watch.php?vid=c20fcffd2" },
+  { season: "3ª Temporada", episode: "Episódio 09", title: "O Homem Sereia e o Mexilhãozinho IV", link: "https://redecanais.ph/watch.php?vid=b3749fe36" },
+  { season: "3ª Temporada", episode: "Episódio 10", title: "Criando Tempo", link: "https://redecanais.ph/watch.php?vid=183dfb7e5" },
+  { season: "3ª Temporada", episode: "Episódio 11", title: "Efeito Bola de Neve", link: "https://redecanais.ph/watch.php?vid=c78b6f166" },
+  { season: "3ª Temporada", episode: "Episódio 12", title: "Lixo do Caranguejo", link: "https://redecanais.ph/watch.php?vid=e9b5bbb9d" },
+  { season: "3ª Temporada", episode: "Episódio 13", title: "Como Na Tv", link: "https://redecanais.ph/watch.php?vid=91b890e60" },
+  { season: "3ª Temporada", episode: "Episódio 14", title: "Dá Pra economizar Uma Moeda?", link: "https://redecanais.ph/watch.php?vid=c402b7952" },
+  { season: "3ª Temporada", episode: "Episódio 15", title: "Pirralho Não Entra", link: "https://redecanais.ph/watch.php?vid=bc5f22871" },
+  { season: "3ª Temporada", episode: "Episódio 16", title: "O Retorno do Squilliam", link: "https://redecanais.ph/watch.php?vid=529432121" },
+  { season: "3ª Temporada", episode: "Episódio 17", title: "Siri Borg", link: "https://redecanais.ph/watch.php?vid=39a1cc001" },
+  { season: "3ª Temporada", episode: "Episódio 18", title: "Nana Neném Conchinha", link: "https://redecanais.ph/watch.php?vid=7cb55d14b" },
+  { season: "3ª Temporada", episode: "Episódio 19", title: "Pintores Molhados", link: "https://redecanais.ph/watch.php?vid=06c347eb3" },
+  { season: "3ª Temporada", episode: "Episódio 20", title: "Vídeo de Treinamento do Siri Cascudo", link: "https://redecanais.ph/watch.php?vid=56f0e0d8e" },
+  { season: "3ª Temporada", episode: "Episódio 21", title: "Festa da Calça Saltitante", link: "https://redecanais.ph/watch.php?vid=a650efbaa" },
+  { season: "3ª Temporada", episode: "Episódio 22", title: "Chocolate Com Nozes", link: "https://redecanais.ph/watch.php?vid=7acb84ae1" },
+  { season: "3ª Temporada", episode: "Episódio 23", title: "O Homem Sereia e o Mexilhãozinho V", link: "https://redecanais.ph/watch.php?vid=988ee226a" },
+  { season: "3ª Temporada", episode: "Episódio 24", title: "Aluno Novo, Estrela do Mar", link: "https://redecanais.ph/watch.php?vid=b5d958bb0" },
+  { season: "3ª Temporada", episode: "Episódio 25", title: "Mexilhões", link: "https://redecanais.ph/watch.php?vid=db63453e9" },
+  { season: "3ª Temporada", episode: "Episódio 26", title: "Uga Uga", link: "https://redecanais.ph/watch.php?vid=ffca2562b" },
+  { season: "3ª Temporada", episode: "Episódio 27", title: "A Grande Corrida dos Caracóis", link: "https://redecanais.ph/watch.php?vid=3ab3ce869" },
+  { season: "3ª Temporada", episode: "Episódio 28", title: "Crustáceo de Meia Idade", link: "https://redecanais.ph/watch.php?vid=47ce30315" },
+  { season: "3ª Temporada", episode: "Episódio 29", title: "Siriguejo Nasce de Novo", link: "https://redecanais.ph/watch.php?vid=e9424a29a" },
+  { season: "3ª Temporada", episode: "Episódio 30", title: "Sofri Um Acidente", link: "https://redecanais.ph/watch.php?vid=7d055afd3" },
+  { season: "3ª Temporada", episode: "Episódio 31", title: "Sirilândia", link: "https://redecanais.ph/watch.php?vid=4bb45bcc5" },
+  { season: "3ª Temporada", episode: "Episódio 32", title: "O Episódio do Acampamento", link: "https://redecanais.ph/watch.php?vid=629d98e25" },
+  { season: "3ª Temporada", episode: "Episódio 33", title: "Identidade Perdida", link: "https://redecanais.ph/watch.php?vid=0eb1b8e51" },
+  { season: "3ª Temporada", episode: "Episódio 34", title: "O Exercito do Plankton", link: "https://redecanais.ph/watch.php?vid=4e71d06d0" },
+  { season: "3ª Temporada", episode: "Episódio 35", title: "A Esponja Que Sabia Voar", link: "https://redecanais.ph/watch.php?vid=49fc6dc53" },
+  { season: "3ª Temporada", episode: "Episódio 36", title: "Bob Esponja Encontra o Estrangulador", link: "https://redecanais.ph/watch.php?vid=c8ebd391c" },
+  { season: "3ª Temporada", episode: "Episódio 37", title: "Brincadeiras Ao Monte", link: "https://redecanais.ph/watch.php?vid=905395ca3" },
+  { season: "4ª Temporada", episode: "Episódio 01", title: "Medo de Hambúrguer de Siri", link: "https://redecanais.ph/watch.php?vid=9bfe73ee3" },
+  { season: "4ª Temporada", episode: "Episódio 02", title: "Másculo, Mesmo Sem Calça", link: "https://redecanais.ph/watch.php?vid=e1de47832" },
+  { season: "4ª Temporada", episode: "Episódio 03", title: "O Colchão Perdido", link: "https://redecanais.ph/watch.php?vid=7a3f35001" },
+  { season: "4ª Temporada", episode: "Episódio 04", title: "Siriguejo Vs. Planckton", link: "https://redecanais.ph/watch.php?vid=8a1507800" },
+  { season: "4ª Temporada", episode: "Episódio 05", title: "Cadê Esse Caracol?", link: "https://redecanais.ph/watch.php?vid=4d006643c" },
+  { season: "4ª Temporada", episode: "Episódio 06", title: "Gancho Habilidoso", link: "https://redecanais.ph/watch.php?vid=8f0ab1fc5" },
+  { season: "4ª Temporada", episode: "Episódio 07", title: "Bons Vizinhos", link: "https://redecanais.ph/watch.php?vid=d0d4f729f" },
+  { season: "4ª Temporada", episode: "Episódio 08", title: "A Venda", link: "https://redecanais.ph/watch.php?vid=bff2e1a2d" },
+  { season: "4ª Temporada", episode: "Episódio 09", title: "Calça Engraçada", link: "https://redecanais.ph/watch.php?vid=7b1b4d052" },
+  { season: "4ª Temporada", episode: "Episódio 10", title: "Masmorras e Dragões", link: "https://redecanais.ph/watch.php?vid=b44eece2b" },
+  { season: "4ª Temporada", episode: "Episódio 11", title: "Padrasto Inimigo", link: "https://redecanais.ph/watch.php?vid=3a5d551bf" },
+  { season: "4ª Temporada", episode: "Episódio 12", title: "Homem Sereia e o Mexilhãozinho VI: O Filme", link: "https://redecanais.ph/watch.php?vid=52fd62248" },
+  { season: "4ª Temporada", episode: "Episódio 13", title: "Patrick Calça Esperta", link: "https://redecanais.ph/watch.php?vid=dc6bb5d95" },
+  { season: "4ª Temporada", episode: "Episódio 14", title: "Bob Lula Calça Tentáculos", link: "https://redecanais.ph/watch.php?vid=7854278b3" },
+  { season: "4ª Temporada", episode: "Episódio 15", title: "A Torre Cascuda", link: "https://redecanais.ph/watch.php?vid=59144e3cf" },
+  { season: "4ª Temporada", episode: "Episódio 16", title: "Sr.a Puff, Está Demitida", link: "https://redecanais.ph/watch.php?vid=8f2cb12dd" },
+  { season: "4ª Temporada", episode: "Episódio 17", title: "Olá Chimpanzés", link: "https://redecanais.ph/watch.php?vid=e9df1b943" },
+  { season: "4ª Temporada", episode: "Episódio 18", title: "O Anfitrião do Fantasma", link: "https://redecanais.ph/watch.php?vid=4009ed594" },
+  { season: "4ª Temporada", episode: "Episódio 19", title: "Aniversário Da Baleia", link: "https://redecanais.ph/watch.php?vid=b5095851c" },
+  { season: "4ª Temporada", episode: "Episódio 20", title: "Ilha do Karatê", link: "https://redecanais.ph/watch.php?vid=90dbc06a4" },
+  { season: "4ª Temporada", episode: "Episódio 21", title: "Nem Tudo Que Reluz", link: "https://redecanais.ph/watch.php?vid=709d2de33" },
+  { season: "4ª Temporada", episode: "Episódio 22", title: "O Poço Dos Desejos", link: "https://redecanais.ph/watch.php?vid=0cf680479" },
+  { season: "4ª Temporada", episode: "Episódio 23", title: "Virando a Página", link: "https://redecanais.ph/watch.php?vid=f29bcd27c" },
+  { season: "4ª Temporada", episode: "Episódio 24", title: "Mordida Contagiosa", link: "https://redecanais.ph/watch.php?vid=feebaf4bd" },
+  { season: "4ª Temporada", episode: "Episódio 25", title: "Férias Desastrosas", link: "https://redecanais.ph/watch.php?vid=157380c63" },
+  { season: "4ª Temporada", episode: "Episódio 26", title: "Peruca da Moda", link: "https://redecanais.ph/watch.php?vid=cd58bf0ca" },
+  { season: "4ª Temporada", episode: "Episódio 27", title: "Viagem Lulástica", link: "https://redecanais.ph/watch.php?vid=8223b36a7" },
+  { season: "4ª Temporada", episode: "Episódio 28", title: "Não É Uma Dama", link: "https://redecanais.ph/watch.php?vid=e1b945f36" },
+  { season: "4ª Temporada", episode: "Episódio 29", title: "A Coisa", link: "https://redecanais.ph/watch.php?vid=997b4ad19" },
+  { season: "4ª Temporada", episode: "Episódio 30", title: "Conversa Fiada", link: "https://redecanais.ph/watch.php?vid=2d0fab652" },
+  { season: "4ª Temporada", episode: "Episódio 31", title: "Pilotando de Chorar", link: "https://redecanais.ph/watch.php?vid=9a5fe14f5" },
+  { season: "4ª Temporada", episode: "Episódio 32", title: "Reinado Dos Idiotas", link: "https://redecanais.ph/watch.php?vid=a1585fc83" },
+  { season: "4ª Temporada", episode: "Episódio 33", title: "Nascido Para Ser Selvagem", link: "https://redecanais.ph/watch.php?vid=43a906225" },
+  { season: "4ª Temporada", episode: "Episódio 34", title: "Grandes Aminimigos", link: "https://redecanais.ph/watch.php?vid=c0a7b314b" },
+  { season: "4ª Temporada", episode: "Episódio 35", title: "O Ladrão Cor de Rosa", link: "https://redecanais.ph/watch.php?vid=e2bfaf638" },
+  { season: "4ª Temporada", episode: "Episódio 36", title: "Lula de Madeira", link: "https://redecanais.ph/watch.php?vid=f5d284af8" },
+  { season: "4ª Temporada", episode: "Episódio 37", title: "Melhor Dia de Todos", link: "https://redecanais.ph/watch.php?vid=44ebe2484" },
+  { season: "4ª Temporada", episode: "Episódio 38", title: "O Presente Da Goma De Mascar", link: "https://redecanais.ph/watch.php?vid=1e9fa1799" },
+  { season: "5ª Temporada", episode: "Episódio 01", title: "Amigo Ou Inimigo?", link: "https://redecanais.ph/watch.php?vid=80ed34589" },
+  { season: "5ª Temporada", episode: "Episódio 02", title: "O Mestre Cuca Original", link: "https://redecanais.ph/watch.php?vid=e0d7ede75" },
+  { season: "5ª Temporada", episode: "Episódio 03", title: "Luz Noturna", link: "https://redecanais.ph/watch.php?vid=f5f72d6c0" },
+  { season: "5ª Temporada", episode: "Episódio 04", title: "Acorde Disposto", link: "https://redecanais.ph/watch.php?vid=6a78594bc" },
+  { season: "5ª Temporada", episode: "Episódio 05", title: "Esperando", link: "https://redecanais.ph/watch.php?vid=7b9444a16" },
+  { season: "5ª Temporada", episode: "Episódio 06", title: "Tem Fungo Entre Nós", link: "https://redecanais.ph/watch.php?vid=6fb9a5404" },
+  { season: "5ª Temporada", episode: "Episódio 07", title: "Amigos Espiões", link: "https://redecanais.ph/watch.php?vid=7eacc9a73" },
+  { season: "5ª Temporada", episode: "Episódio 08", title: "Pilotagem Consciente", link: "https://redecanais.ph/watch.php?vid=9d226b0d5" },
+  { season: "5ª Temporada", episode: "Episódio 09", title: "Qual É O Nome Dele?", link: "https://redecanais.ph/watch.php?vid=9671b9b15" },
+  { season: "5ª Temporada", episode: "Episódio 10", title: "Novas Acomodações", link: "https://redecanais.ph/watch.php?vid=46944b16e" },
+  { season: "5ª Temporada", episode: "Episódio 11", title: "Siri A La Mode", link: "https://redecanais.ph/watch.php?vid=94dc19c7a" },
+  { season: "5ª Temporada", episode: "Episódio 12", title: "Medo De Montanha-Russa", link: "https://redecanais.ph/watch.php?vid=0f930591e" },
+  { season: "5ª Temporada", episode: "Episódio 13", title: "Balde Doce Balde", link: "https://redecanais.ph/watch.php?vid=825b80366" },
+  { season: "5ª Temporada", episode: "Episódio 14", title: "Adoro a Patty", link: "https://redecanais.ph/watch.php?vid=ba42cbe20" },
+  { season: "5ª Temporada", episode: "Episódio 15", title: "O Gostinho Do Novo Lula Molusco", link: "https://redecanais.ph/watch.php?vid=71d49d9a9" },
+  { season: "5ª Temporada", episode: "Episódio 16", title: "O Dinheiro Fala", link: "https://redecanais.ph/watch.php?vid=032bdaf9c" },
+  { season: "5ª Temporada", episode: "Episódio 17", title: "Bob Esponja Vs. A Máquina De Fazer Hambúrguer", link: "https://redecanais.ph/watch.php?vid=eb70ed6c5" },
+  { season: "5ª Temporada", episode: "Episódio 18", title: "Dança Pegajosa", link: "https://redecanais.ph/watch.php?vid=84e1cf16b" },
+  { season: "5ª Temporada", episode: "Episódio 19", title: "A Esponja Cascuda", link: "https://redecanais.ph/watch.php?vid=f0f6a3220" },
+  { season: "5ª Temporada", episode: "Episódio 20", title: "A Música do Patrick", link: "https://redecanais.ph/watch.php?vid=e58983163" },
+  { season: "5ª Temporada", episode: "Episódio 21", title: "Uma Pulga No Domo Dela", link: "https://redecanais.ph/watch.php?vid=b80dbfe60" },
+  { season: "5ª Temporada", episode: "Episódio 22", title: "A Rosquinha Da Vergonha", link: "https://redecanais.ph/watch.php?vid=51b1f5b99" },
+  { season: "5ª Temporada", episode: "Episódio 23", title: "O Prato Cascudo", link: "https://redecanais.ph/watch.php?vid=68512c04e" },
+  { season: "5ª Temporada", episode: "Episódio 24", title: "Gás Gu-gu Da-dá", link: "https://redecanais.ph/watch.php?vid=f8adb638f" },
+  { season: "5ª Temporada", episode: "Episódio 25", title: "La Grande Troca", link: "https://redecanais.ph/watch.php?vid=1e3705a7b" },
+  { season: "5ª Temporada", episode: "Episódio 26", title: "Descobrindo A Atlântida", link: "https://redecanais.ph/watch.php?vid=b0fce262d" },
+  { season: "5ª Temporada", episode: "Episódio 27", title: "O Dia Da Foto", link: "https://redecanais.ph/watch.php?vid=47548cec6" },
+  { season: "5ª Temporada", episode: "Episódio 28", title: "Patrick Não Paga", link: "https://redecanais.ph/watch.php?vid=f375eb85d" },
+  { season: "5ª Temporada", episode: "Episódio 29", title: "BlackJack", link: "https://redecanais.ph/watch.php?vid=3bac849aa" },
+  { season: "5ª Temporada", episode: "Episódio 30", title: "Esponja Roxa", link: "https://redecanais.ph/watch.php?vid=9cc1d9d1c" },
+  { season: "5ª Temporada", episode: "Episódio 31", title: "Homem Sereia Vs. Bob Esponja", link: "https://redecanais.ph/watch.php?vid=a75a8b3bb" },
+  { season: "5ª Temporada", episode: "Episódio 32", title: "Os Reclusos Do Verão", link: "https://redecanais.ph/watch.php?vid=d18973bfb" },
+  { season: "5ª Temporada", episode: "Episódio 33", title: "Salvando Um Esquilo", link: "https://redecanais.ph/watch.php?vid=81cc57412" },
+  { season: "5ª Temporada", episode: "Episódio 34", title: "A Peste Do Oeste", link: "https://redecanais.ph/watch.php?vid=756fd3ff6" },
+  { season: "5ª Temporada", episode: "Episódio 35", title: "20.000 Hambúrguer Submarino", link: "https://redecanais.ph/watch.php?vid=0f653f3a3" },
+  { season: "5ª Temporada", episode: "Episódio 36", title: "A Batalha Da Fenda Do Biquíni", link: "https://redecanais.ph/watch.php?vid=7ace7bf55" },
+  { season: "5ª Temporada", episode: "Episódio 37", title: "O Que Aconteceu Com O Bob Esponja?", link: "https://redecanais.ph/watch.php?vid=d03c77a13" },
+  { season: "5ª Temporada", episode: "Episódio 38", title: "As Duas Caras Do Lula Molusco", link: "https://redecanais.ph/watch.php?vid=f21443fb8" },
+  { season: "5ª Temporada", episode: "Episódio 39", title: "Monumento De Esponja", link: "https://redecanais.ph/watch.php?vid=01b0326c2" },
+  { season: "5ª Temporada", episode: "Episódio 40", title: "Banido/Interdição Da Fenda Do Biquini", link: "https://redecanais.ph/watch.php?vid=9ac85eac7" },
+  { season: "5ª Temporada", episode: "Episódio 41", title: "Stanley S. Calça Quadrada", link: "https://redecanais.ph/watch.php?vid=ba609c98d" },
+  { season: "6ª Temporada", episode: "Episódio 01", title: "Casa Chique", link: "https://redecanais.ph/bob-esponja-episodio-01-casa-chique_0fb11b9b2.html" },
+  { season: "6ª Temporada", episode: "Episódio 02", title: "Estrada do CarSiri", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-02-estrada-do-carsiri_ff57250d7.html" },
+  { season: "6ª Temporada", episode: "Episódio 03", title: "Doidos Por Tostões", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-03-doidos-por-tostoes_d4e3cedea.html" },
+  { season: "6ª Temporada", episode: "Episódio 04", title: "Novato Náutico", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-04-novato-nautico_74be8fd57.html" },
+  { season: "6ª Temporada", episode: "Episódio 05", title: "Esponjicus", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-05-esponjicus_58bf071b4.html" },
+  { season: "6ª Temporada", episode: "Episódio 06", title: "Sinfonia Das Ventosas", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-06-sinfonia-das-ventosas_a88e524ae.html" },
+  { season: "6ª Temporada", episode: "Episódio 07", title: "Não É Normal", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-07-nao-e-normal_0bd61f805.html" },
+  { season: "6ª Temporada", episode: "Episódio 08", title: "Desaparecidos", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-08-desaparecidos_422907eac.html" },
+  { season: "6ª Temporada", episode: "Episódio 09", title: "A Farpa", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-09-a-farpa_dc2326d40.html" },
+  { season: "6ª Temporada", episode: "Episódio 10", title: "Os Palhaços do Assobio", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-10-os-palhacos-do-assobio_45a11bc03.html" },
+  { season: "6ª Temporada", episode: "Episódio 11", title: "Uma Vida Num Dia", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-11-uma-vida-num-dia_9c06fc0e1.html" },
+  { season: "6ª Temporada", episode: "Episódio 12", title: "Alvejado", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-12-alvejado_46f62271b.html" },
+  { season: "6ª Temporada", episode: "Episódio 13", title: "Lula Molusco Gigante", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-13-lula-molusco-gigante_6a523fbb9.html" },
+  { season: "6ª Temporada", episode: "Episódio 14", title: "Nenhum Nariz Sabe", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-14-nenhum-nariz-sabe_08bd984f7.html" },
+  { season: "6ª Temporada", episode: "Episódio 15", title: "Hambúrguer e Delito", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-15-hamburguer-e-delito_60150de1e.html" },
+  { season: "6ª Temporada", episode: "Episódio 16", title: "O Cliente Assíduo do Plankton", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-16-o-cliente-assiduo-do-plankton_3394ec195.html" },
+  { season: "6ª Temporada", episode: "Episódio 17", title: "Amigos Pilotos", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-17-amigos-pilotos_5c1c21785.html" },
+  { season: "6ª Temporada", episode: "Episódio 18", title: "A Gazeta do Siri", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-18-a-gazeta-do-siri_37bcb2649.html" },
+  { season: "6ª Temporada", episode: "Episódio 19", title: "A Festa do Pijama", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-19-a-festa-do-pijama_651c12993.html" },
+  { season: "6ª Temporada", episode: "Episódio 20", title: "Gary Enfeitado", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-20-gary-enfeitado_df2b3dae8.html" },
+  { season: "6ª Temporada", episode: "Episódio 21", title: "Bob Esponja E A Onda Gigante", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-21-bob-esponja-e-a-onda-gigante_d37e98f7f.html" },
+  { season: "6ª Temporada", episode: "Episódio 22", title: "Bolsos Porosos", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-22-bolsos-porosos_abc0acf08.html" },
+  { season: "6ª Temporada", episode: "Episódio 23", title: "Os Rapazes Do Coro", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-23-os-rapazes-do-coro_fb215632f.html" },
+  { season: "6ª Temporada", episode: "Episódio 24", title: "Os Crocantes Apetitosos", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-24-os-crocantes-apetitosos_33bb72343.html" },
+  { season: "6ª Temporada", episode: "Episódio 25", title: "A Figurinha", link: "https://redecanais.ph/bob-esponja-episodio-6-temporada-episodio-25-a-figurinha_dc90dddd8.html" },
+  { season: "6ª Temporada", episode: "Episódio 26", title: "Queridos Vikings", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-26-queridos-vikings_bb9e57b5d.html" },
+  { season: "6ª Temporada", episode: "Episódio 27", title: "A Trapaça", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-27-a-trapaca_70d3350f6.html" },
+  { season: "6ª Temporada", episode: "Episódio 28", title: "O Vovô Pirata", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-28-o-vovo-pirata_dab741a92.html" },
+  { season: "6ª Temporada", episode: "Episódio 29", title: "Loja Maçônica Cefalópode", link: "https://redecanais.ph/watch.php?vid=a6c1dbec5" },
+  { season: "6ª Temporada", episode: "Episódio 30", title: "Visita Do Lula", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-30-visita-do-lula_9b33208c0.html" },
+  { season: "6ª Temporada", episode: "Episódio 31", title: "Para O Calça Quadrada Ou Não", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-31-para-o-calca-quadrada-ou-nao_e9bda03db.html" },
+  { season: "6ª Temporada", episode: "Episódio 32", title: "Embarque Atrapalhado", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-32-embarque-atrapalhado_90d9a6f9e.html" },
+  { season: "6ª Temporada", episode: "Episódio 33", title: "Professor Lula Molusco", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-33-professor-lula-molusco_f6c2ea153.html" },
+  { season: "6ª Temporada", episode: "Episódio 34", title: "Mascotes Ou Pestes", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-34-mascotes-ou-pestes_73e7b6e29.html" },
+  { season: "6ª Temporada", episode: "Episódio 35", title: "Computador Sobrecarregado", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-35-computador-sobrecarregado_cc51ae643.html" },
+  { season: "6ª Temporada", episode: "Episódio 36", title: "Calça Ingenua", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-36-calca-ingenua_a5a71684a.html" },
+  { season: "6ª Temporada", episode: "Episódio 37", title: "Sobrecarregado", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-37-sobrecarregado_17306c52b.html" },
+  { season: "6ª Temporada", episode: "Episódio 38", title: "Nada de Chapéu Pro Patrick", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-38-nada-de-chapeu-pro-patrick_fb1df1e7b.html" },
+  { season: "6ª Temporada", episode: "Episódio 39", title: "Loja De Brinquedos Ameaçadores", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-39-loja-de-brinquedos-ameacadores_7f84e9e8c.html" },
+  { season: "6ª Temporada", episode: "Episódio 40", title: "Castelos de Areia Na Areia", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-40-castelos-de-areia-na-areia_3a62a314d.html" },
+  { season: "6ª Temporada", episode: "Episódio 41", title: "Casca Em Choque", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-41-casca-em-choque_2de06c20e.html" },
+  { season: "6ª Temporada", episode: "Episódio 42", title: "Balde de Lixo Supremo", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-42-balde-de-lixo-supremo_de047c647.html" },
+  { season: "6ª Temporada", episode: "Episódio 43", title: "Aniversário de Casamento do Unicelular", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-43-aniversario-de-casamento-do-unicelular_407198e2e.html" },
+  { season: "6ª Temporada", episode: "Episódio 44", title: "Entrando Numa Fria (Parte 1)", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-44-entrando-numa-fria-parte-1_07b79d47d.html" },
+  { season: "6ª Temporada", episode: "Episódio 45", title: "Entrando Numa Fria (Parte 2)", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-45-entrando-numa-fria-parte-2_c3d5cd08c.html" },
+  { season: "6ª Temporada", episode: "Episódio 46", title: "Tempo De Abacaxi", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-46-tempo-de-abacaxi_6e822ddc4.html" },
+  { season: "6ª Temporada", episode: "Episódio 47", title: "Cavernas De Salmão", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-47-cavernas-de-salmao_87778a312.html" },
+  { season: "6ª Temporada", episode: "Episódio 48", title: "Fúria De Tritão", link: "https://redecanais.ph/bob-esponja-6-temporada-episodio-48-furia-de-tritao_2b19c1411.html" },
+  { season: "7ª Temporada", episode: "Episódio 01", title: "Visão De Tentáculos", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-01-visao-de-tentaculos_336bca6c8.html" },
+  { season: "7ª Temporada", episode: "Episódio 02", title: "Adoro Dançar", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-02-adoro-dancar_d1ff3ba17.html" },
+  { season: "7ª Temporada", episode: "Episódio 03", title: "Período De Crescimento", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-03-periodo-de-crescimento_c4c1f5d29.html" },
+  { season: "7ª Temporada", episode: "Episódio 04", title: "Presos Nos Rolos Espremedores", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-04-presos-nos-rolos-espremedores_f98bc0ed2.html" },
+  { season: "7ª Temporada", episode: "Episódio 05", title: "Tem Alguém Na Cozinha Com A Sandy", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-05-tem-alguem-na-cozinha-com-a-sandy_95360a50d.html" },
+  { season: "7ª Temporada", episode: "Episódio 06", title: "Crime Caseiro", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-06-crime-caseiro_791d8bce3.html" },
+  { season: "7ª Temporada", episode: "Episódio 07", title: "Bolos Engordurados", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-07-bolos-engordurados_9595ce35f.html" },
+  { season: "7ª Temporada", episode: "Episódio 08", title: "Esponja Modelo", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-08-esponja-modelo_c01b6d94a.html" },
+  { season: "7ª Temporada", episode: "Episódio 09", title: "Mantenha A Fenda Do Bikini Bonita", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-09-mantenha-a-fenda-do-bikini-bonita_53d7bdece.html" },
+  { season: "7ª Temporada", episode: "Episódio 10", title: "Um Companheiro Para Gary", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-10-um-companheiro-para-gary_2fc9fdd6b.html" },
+  { season: "7ª Temporada", episode: "Episódio 11", title: "Seu, Meu e Meu", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-11-seu-meu-e-meu_64a07fbff.html" },
+  { season: "7ª Temporada", episode: "Episódio 12", title: "Siri Rachado", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-12-siri-rachado_a6bf9544b.html" },
+  { season: "7ª Temporada", episode: "Episódio 13", title: "O Feitiço Da Fenda Do Bikini", link: "https://redecanais.ph/bob-esponja-episodio-13-o-feitico-da-fenda-do-bikini_8e9554026.html" },
+  { season: "7ª Temporada", episode: "Episódio 14", title: "Lula Molusco na Clarinetalândia", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-14-lula-molusco-na-clarinetalandia_b8cf86950.html" },
+  { season: "7ª Temporada", episode: "Episódio 15", title: "Bob Esponja Protesta", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-15-bob-esponja-protesta_fe9524f05.html" },
+  { season: "7ª Temporada", episode: "Episódio 16", title: "De Volta Ao Passado", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-16-de-volta-ao-passado_573b102b8.html" },
+  { season: "7ª Temporada", episode: "Episódio 17", title: "O Clube Dos Vilões", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-17-o-clube-dos-viloes_84e30b33e.html" },
+  { season: "7ª Temporada", episode: "Episódio 18", title: "Um Dia Sem Lágrimas", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-18-um-dia-sem-lagrimas_e3de24da8.html" },
+  { season: "7ª Temporada", episode: "Episódio 19", title: "Emprego de Verão", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-19-emprego-de-verao_bfd8d3e0e.html" },
+  { season: "7ª Temporada", episode: "Episódio 20", title: "Refeição Grosseira", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-20-refeicao-grosseira_8fad0dbf9.html" },
+  { season: "7ª Temporada", episode: "Episódio 21", title: "O Gary Apaixonado", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-21-o-gary-apaixonado_2d7c2ff32.html" },
+  { season: "7ª Temporada", episode: "Episódio 22", title: "O Negócio É Teatro", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-22-o-negocio-e-teatro_e72810a0d.html" },
+  { season: "7ª Temporada", episode: "Episódio 23", title: "Confusão No Rodeio", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-23-confusao-no-rodeio_b5940dafe.html" },
+  { season: "7ª Temporada", episode: "Episódio 24", title: "A Receita Secreta Da Vovó", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-24-a-receita-secreta-da-vovo_55cd61bd9.html" },
+  { season: "7ª Temporada", episode: "Episódio 25", title: "Faro de Dinheiro", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-25-faro-de-dinheiro_02f6ad31e.html" },
+  { season: "7ª Temporada", episode: "Episódio 26", title: "O Monstro Que Foi Para Fenda Do Bikini", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-26-o-monstro-que-foi-para-fenda-do-bikini_8d767e1d6.html" },
+  { season: "7ª Temporada", episode: "Episódio 27", title: "Bem Vindo Ao Triangulo Da Fenda Do Bikini", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-27-bem-vindo-ao-triangulo-da-fenda-do-bikini_6c2ffdb6e.html" },
+  { season: "7ª Temporada", episode: "Episódio 28", title: "O Feitiço Da Bruxa", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-28-o-feitico-da-bruxa_22e39cb8b.html" },
+  { season: "7ª Temporada", episode: "Episódio 29", title: "O Ralo Principal", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-29-o-ralo-principal_3eaa4181d.html" },
+  { season: "7ª Temporada", episode: "Episódio 30", title: "Caipiras Durões", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-30-caipiras-duroes_8ba8cf2c7.html" },
+  { season: "7ª Temporada", episode: "Episódio 31", title: "Esponja Vulcão", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-31-esponja-vulcao_86f3ebb77.html" },
+  { season: "7ª Temporada", episode: "Episódio 32", title: "O Grande Assalto Ao Trem", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-32-o-grande-assalto-ao-trem_514e35aef.html" },
+  { season: "7ª Temporada", episode: "Episódio 33", title: "No Fundo Do Poço", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-33-no-fundo-do-poco_4799999f7.html" },
+  { season: "7ª Temporada", episode: "Episódio 34", title: "Estrela Do Karatê", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-34-estrela-do-karate_fd961a91b.html" },
+  { season: "7ª Temporada", episode: "Episódio 35", title: "Enterrado Na Hora Certa", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-35-enterrado-na-hora-certa_0d45738f5.html" },
+  { season: "7ª Temporada", episode: "Episódio 36", title: "Sonhos Encantados De Tiki", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-36-sonhos-encantados-de-tiki_d453b9163.html" },
+  { season: "7ª Temporada", episode: "Episódio 37", title: "O Lado Abrasivo", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-37-o-lado-abrasivo_b2098870a.html" },
+  { season: "7ª Temporada", episode: "Episódio 38", title: "Verme De Ouvido", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-38-verme-de-ouvido_8d2f60efd.html" },
+  { season: "7ª Temporada", episode: "Episódio 39", title: "Esconder E Então O Que Acontece?", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-39-esconder-e-entao-o-que-acontece_d9548923a.html" },
+  { season: "7ª Temporada", episode: "Episódio 40", title: "Trapaça com a Casca", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-40-trapaca-com-a-casca_32c0678a0.html" },
+  { season: "7ª Temporada", episode: "Episódio 41", title: "A Obra Prima", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-41-a-obra-prima_e5a65a549.html" },
+  { season: "7ª Temporada", episode: "Episódio 42", title: "Ataque de Búzios", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-42-ataque-de-buzios_a9ed02215.html" },
+  { season: "7ª Temporada", episode: "Episódio 43", title: "Você Não Conhece A Esponja", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-43-voce-nao-conhece-a-esponja_71692e50e.html" },
+  { season: "7ª Temporada", episode: "Episódio 44", title: "O Túnel Da Luva Do Amor", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-44-o-tunel-da-luva-do-amor_7d722fb81.html" },
+  { season: "7ª Temporada", episode: "Episódio 45", title: "Cascudo Quente", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-45-cascudo-quente_821cf15c7.html" },
+  { season: "7ª Temporada", episode: "Episódio 46", title: "O Naufrágio de Mauna Loa", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-46-o-naufragio-de-mauna-loa_4fca85cfd.html" },
+  { season: "7ª Temporada", episode: "Episódio 47", title: "Peixe Novo Na Cidade", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-47-peixe-novo-na-cidade_c629286c7.html" },
+  { season: "7ª Temporada", episode: "Episódio 48", title: "Adoro Essa Lula", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-48-adoro-essa-lula_bb7913182.html" },
+  { season: "7ª Temporada", episode: "Episódio 49", title: "Sam, A Irmã Mais Velha", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-49-sam-a-irma-mais-velha_f11ae160f.html" },
+  { season: "7ª Temporada", episode: "Episódio 50", title: "Química Perfeita", link: "https://redecanais.ph/bob-esponja-7-temporada-episodio-50-quimica-perfeita_c34b1cde1.html" },
+  { season: "8ª Temporada", episode: "Episódio 01", title: "Acidentes Acontecem", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-01-acidentes-acontecem_20cc4a831.html" },
+  { season: "8ª Temporada", episode: "Episódio 02", title: "O Outro Hambúrguer", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-02-o-outro-hamburguer_79ef3902d.html" },
+  { season: "8ª Temporada", episode: "Episódio 03", title: "Drive Thru", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-03-drive-thru_93e7e6cd3.html" },
+  { season: "8ª Temporada", episode: "Episódio 04", title: "A Celebridade", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-04-a-celebridade_79142060b.html" },
+  { season: "8ª Temporada", episode: "Episódio 05", title: "Um Jogo Amistoso", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-05-um-jogo-amistoso_dc5933f47.html" },
+  { season: "8ª Temporada", episode: "Episódio 06", title: "Esponja Sentimental", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-06-esponja-sentimental_e51d7a7bf.html" },
+  { season: "8ª Temporada", episode: "Episódio 07", title: "Confronto Gelado", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-07-confronto-gelado_bc5221849.html" },
+  { season: "8ª Temporada", episode: "Episódio 08", title: "Escola Para Adultos Do Lula Molusco", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-08-escola-para-adultos-do-lula-molusco_4236bde1a.html" },
+  { season: "8ª Temporada", episode: "Episódio 09", title: "Relatório Oral", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-09-relatorio-oral_ff825c4c2.html" },
+  { season: "8ª Temporada", episode: "Episódio 10", title: "Lula Doce e Amarga", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-10-lula-doce-e-amarga_58f66a165.html" },
+  { season: "8ª Temporada", episode: "Episódio 11", title: "O Artista Dos Olhos Enviesados", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-11-o-artista-dos-olhos-enviesados_25def5f7f.html" },
+  { season: "8ª Temporada", episode: "Episódio 12", title: "Férias Da Família Do Calça Quadrada", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-12-ferias-da-familia-do-calca-quadrada_34d90600c.html" },
+  { season: "8ª Temporada", episode: "Episódio 13", title: "Fiquérias Do Patrick", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-13-fiquerias-do-patrick_68170157e.html" },
+  { season: "8ª Temporada", episode: "Episódio 14", title: "Passeando com Plankton", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-14-passeando-com-plankton_95e863cd3.html" },
+  { season: "8ª Temporada", episode: "Episódio 15", title: "Férias Lunares", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-15-ferias-lunares_5ecd95bb6.html" },
+  { season: "8ª Temporada", episode: "Episódio 16", title: "O Sr. Siriguejo Tira Férias", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-16-o-sr-siriguejo-tira-ferias_2816e8c1d.html" },
+  { season: "8ª Temporada", episode: "Episódio 17", title: "Tem Gente Que Acredita Em Fantasmas", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-17-tem-gente-que-acredita-em-fantasmas_a8bdf01d2.html" },
+  { season: "8ª Temporada", episode: "Episódio 18", title: "O Inicio Do Homem Sereia", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-18-o-inicio-do-homem-sereia_2d4598288.html" },
+  { season: "8ª Temporada", episode: "Episódio 19", title: "O Olho Bom Do Plankton", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-19-o-olho-bom-do-plankton_7a9be8ef3.html" },
+  { season: "8ª Temporada", episode: "Episódio 20", title: "Cara De Mexilhão", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-20-cara-de-mexilhao_1c34a64dd.html" },
+  { season: "8ª Temporada", episode: "Episódio 21", title: "Pat, Babá de Mascotes", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-21-pat-baba-de-mascotes_c374100b5.html" },
+  { season: "8ª Temporada", episode: "Episódio 22", title: "Tomando Conta da Casa da Sandy", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-22-tomando-conta-da-casa-da-sandy_40d1cd40a.html" },
+  { season: "8ª Temporada", episode: "Episódio 23", title: "Jazz Suave Na Fenda do Bikini", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-23-jazz-suave-na-fenda-do-bikini_f759cf9f2.html" },
+  { season: "8ª Temporada", episode: "Episódio 24", title: "O Jeito da Esponja", link: "https://redecanais.ph/bob-esponja-episodio-8-temporada-24-o-jeito-da-esponja_ed0ae42e2.html" },
+  { season: "8ª Temporada", episode: "Episódio 25", title: "Bolhas Problemáticas", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-25-bolhas-problematicas_4e1c710ad.html" },
+  { season: "8ª Temporada", episode: "Episódio 26", title: "O Hambúrguer de Siri Que Comeu a Fenda do Bikini", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-26-o-hamburguer-de-siri-que-comeu-a-fenda-do-bikini_d379015b1.html" },
+  { season: "8ª Temporada", episode: "Episódio 27", title: "O Retorno Do Amigo Bolha", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-27-o-retorno-do-amigo-bolha_594ff97d5.html" },
+  { season: "8ª Temporada", episode: "Episódio 28", title: "Ordem de Restrição ao Bob Esponja", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-28-ordem-de-restricao-ao-bob-esponja_343bf78d5.html" },
+  { season: "8ª Temporada", episode: "Episódio 29", title: "Fiasco!", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-29-fiasco_bfb09aa26.html" },
+  { season: "8ª Temporada", episode: "Episódio 30", title: "Está Feliz Agora?", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-30-esta-feliz-agora_16abe122f.html" },
+  { season: "8ª Temporada", episode: "Episódio 31", title: "Planeta das Águas Vivas", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-31-planeta-das-aguas-vivas_5061b2ce7.html" },
+  { season: "8ª Temporada", episode: "Episódio 32", title: "Amostra Grátis", link: "https://redecanais.ph/bob-esponja-episodio-8-temporada-32-amostra-gratis_43e9c2bae.html" },
+  { season: "8ª Temporada", episode: "Episódio 33", title: "Lar Doce Entolho", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-33-lar-doce-entolho_3877ec9da.html" },
+  { season: "8ª Temporada", episode: "Episódio 34", title: "Karen 2", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-34-karen-2_b4f2a6000.html" },
+  { season: "8ª Temporada", episode: "Episódio 35", title: "Esponja com Insônia", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-35-esponja-com-insonia_9eaf01fe2.html" },
+  { season: "8ª Temporada", episode: "Episódio 36", title: "Careta Definitiva!", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-36-careta-definitiva_c4423ff24.html" },
+  { season: "8ª Temporada", episode: "Episódio 37", title: "Mundo da Luva, Descanse em Paz", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-37-mundo-da-luva-descanse-em-paz_34137db70.html" },
+  { season: "8ª Temporada", episode: "Episódio 38", title: "Lulite", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-38-lulite_655343db2.html" },
+  { season: "8ª Temporada", episode: "Episódio 39", title: "Ignorante na Corrida", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-39-ignorante-na-corrida_1e271881a.html" },
+  { season: "8ª Temporada", episode: "Episódio 40", title: "Petiscos", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-40-petiscos_3bb1cc8cd.html" },
+  { season: "8ª Temporada", episode: "Episódio 41", title: "Para Comer Aqui ou Pra Viagem?", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-41-para-comer-aqui-ou-pra-viagem_6bd732812.html" },
+  { season: "8ª Temporada", episode: "Episódio 42", title: "O Natal do Bob Esponja!", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-42-o-natal-do-bob-esponja_3516cb342.html" },
+  { season: "8ª Temporada", episode: "Episódio 43", title: "A Equipe Do Vilão Aquático Super Malvado Ataca", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-43-a-equipe-do-vilao-aquatico-super-malvado-ataca_6f7cb02b7.html" },
+  { season: "8ª Temporada", episode: "Episódio 44", title: "Fricassé De Salmão", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-44-fricasse-de-salmao_83d88d75d.html" },
+  { season: "8ª Temporada", episode: "Episódio 45", title: "Em Nome Do Siri Cascudo", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-45-em-nome-do-siri-cascudo_973001d0b.html" },
+  { season: "8ª Temporada", episode: "Episódio 46", title: "Mexa-se Ou Perca", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-46-mexa-se-ou-perca_b06b00e3f.html" },
+  { season: "8ª Temporada", episode: "Episódio 47", title: "Olá Fenda do Bikini!", link: "https://redecanais.ph/bob-esponja-8-temporada-episodio-47-ola-fenda-do-bikini_47769cafc.html" },
+];
+
+// ── DOM refs ──
+const episodeArea = document.getElementById('episodeArea');
+const watchBtn    = document.getElementById('watchBtn');
+const historyList = document.getElementById('historyList');
+const totalCount  = document.getElementById('totalCount');
+
+// ── State ──
+let history = [];
+
+// ── Init ──
+totalCount.innerHTML = `${episodes.length} <span>Episódios</span>`;
+
+// ── Logic ──
+function pickRandom() {
+  const idx      = Math.floor(Math.random() * episodes.length);
+  const selected = episodes[idx];
+
+  // Update episode display with animation
+  episodeArea.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.className = 'animate-in';
+  wrapper.innerHTML = `
+    <div class="episode-meta">${selected.season} &bull; ${selected.episode}</div>
+    <h1 class="episode-title">${selected.title}</h1>
+  `;
+  episodeArea.appendChild(wrapper);
+
+  // Update watch button
+  watchBtn.href = selected.link;
+  watchBtn.style.display = 'inline-flex';
+
+  // Update history (unique titles, max 4)
+  history = [selected, ...history];
+  const seen = new Set();
+  history = history.filter(ep => {
+    if (seen.has(ep.title)) return false;
+    seen.add(ep.title);
+    return true;
+  }).slice(0, 4);
+
+  renderHistory();
+}
+
+function renderHistory() {
+  if (history.length === 0) {
+    historyList.innerHTML = '<li class="empty-history">Nenhum episódio sorteado ainda.</li>';
+    return;
+  }
+  historyList.innerHTML = history.map(ep => `
+    <li class="history-item animate-in">
+      <span class="history-item-title">${ep.title}</span>
+      <span class="history-item-meta">${ep.season} &bull; ${ep.episode}</span>
+    </li>
+  `).join('');
+}
+</script>
+</body>
+</html>
