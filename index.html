@@ -100,6 +100,7 @@
       text-transform: uppercase;
       letter-spacing: .15em;
       margin-bottom: .5rem;
+      white-space: nowrap;          /* sempre em linha única; o JS reduz a fonte se precisar */
     }
 
     .episode-title {
@@ -108,6 +109,18 @@
       line-height: 1.1;
       margin-bottom: 1.5rem;
       max-width: 500px;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+
+    /* rede de segurança: se nem no tamanho mínimo couber em 3 linhas, corta com reticências */
+    .episode-title.clamped {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+      padding-bottom: .12em;
     }
 
     .empty-msg {
@@ -145,6 +158,15 @@
       box-shadow: 0 4px 12px rgba(0,0,0,.3);
     }
 
+    /* ── MOBILE: aproxima o bloco do título dos botões ── */
+    @media (max-width: 767px) {
+      .layout { min-height: 0; }                 /* não estica o card para preencher a tela */
+      .main-card { gap: 1.25rem; }
+      .episode-area { min-height: 0; }
+      .episode-title { margin-bottom: 0; }
+      .btn-row { margin-top: 0; }
+    }
+
     .btn-primary { background: #F9D71C; color: #0F1219; }
     .btn-primary:hover { background: #e5c518; }
 
@@ -179,13 +201,40 @@
       padding: .75rem 0;
       border-bottom: 1px solid rgba(255,255,255,.1);
       display: flex;
-      flex-direction: column;
-      gap: .25rem;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
     }
     .history-item:last-child { border-bottom: none; }
 
+    .history-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+      min-width: 0;
+      flex: 1;
+    }
+
     .history-item-title { font-size: .9375rem; font-weight: 500; }
     .history-item-meta  { font-size: .75rem; color: rgba(255,255,255,.6); }
+
+    .history-play {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #fff;               /* mesma cor do "Assistir agora" */
+      color: #0F1219;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.3);
+      transition: background .15s;
+    }
+    .history-play:hover { background: #e5e5e5; }
+    .history-play svg { margin-left: 2px; } /* compensa o centro óptico do triângulo */
 
     .empty-history { font-size: .875rem; color: rgba(255,255,255,.4); font-style: italic; padding: .75rem 0; }
 
@@ -633,6 +682,7 @@ function pickRandom() {
     <h1 class="episode-title">${selected.title}</h1>
   `;
   episodeArea.appendChild(wrapper);
+  fitEpisode();
 
   // Update watch button
   watchBtn.href = selected.link;
@@ -657,11 +707,60 @@ function renderHistory() {
   }
   historyList.innerHTML = history.map(ep => `
     <li class="history-item animate-in">
-      <span class="history-item-title">${ep.title}</span>
-      <span class="history-item-meta">${ep.season} &bull; ${ep.episode}</span>
+      <div class="history-item-info">
+        <span class="history-item-title">${ep.title}</span>
+        <span class="history-item-meta">${ep.season} &bull; ${ep.episode}</span>
+      </div>
+      <a class="history-play" href="${ep.link}" target="_blank" rel="noopener noreferrer"
+         aria-label="Assistir ${ep.title}" title="Assistir">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <polygon points="6 3 20 12 6 21 6 3"/>
+        </svg>
+      </a>
     </li>
   `).join('');
 }
+
+// ── Ajuste automático de fonte ──
+// Reduz o font-size até o texto caber: em 1 linha (meta) ou em no máximo N linhas (título).
+function fitText(el, maxLines, minPx) {
+  el.classList.remove('clamped');
+  el.style.fontSize = '';                                   // volta ao tamanho máximo definido no CSS
+  const maxPx = parseFloat(getComputedStyle(el).fontSize);
+
+  const fits = () => {
+    if (el.scrollWidth > el.clientWidth + 1) return false;  // estouro horizontal (palavra longa / nowrap)
+    if (maxLines === 1) return true;                        // linha única: nowrap já garante a altura
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    return el.scrollHeight <= lh * maxLines + 1;            // altura máxima = N linhas
+  };
+
+  if (fits()) return;
+
+  let lo = minPx, hi = maxPx;                               // lo = cabe (assumido), hi = não cabe
+  while (hi - lo > 0.5) {
+    const mid = (lo + hi) / 2;
+    el.style.fontSize = mid + 'px';
+    if (fits()) lo = mid; else hi = mid;
+  }
+  el.style.fontSize = lo + 'px';
+
+  // Se nem no tamanho mínimo coube, corta com reticências (garante o limite de linhas)
+  if (!fits() && maxLines > 1) el.classList.add('clamped');
+}
+
+function fitEpisode() {
+  const meta  = episodeArea.querySelector('.episode-meta');
+  const title = episodeArea.querySelector('.episode-title');
+  if (meta)  fitText(meta, 1, 9);
+  if (title) fitText(title, 3, 18);
+}
+
+let resizeFrame;
+window.addEventListener('resize', () => {
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(fitEpisode);
+});
 </script>
 </body>
 </html>
