@@ -158,15 +158,6 @@
       box-shadow: 0 4px 12px rgba(0,0,0,.3);
     }
 
-    /* ── MOBILE: aproxima o bloco do título dos botões ── */
-    @media (max-width: 767px) {
-      .layout { min-height: 0; }                 /* não estica o card para preencher a tela */
-      .main-card { gap: 1.25rem; }
-      .episode-area { min-height: 0; }
-      .episode-title { margin-bottom: 0; }
-      .btn-row { margin-top: 0; }
-    }
-
     .btn-primary { background: #F9D71C; color: #0F1219; }
     .btn-primary:hover { background: #e5c518; }
 
@@ -246,6 +237,60 @@
 
     /* SVG icons */
     svg { flex-shrink: 0; }
+
+    /* ── MOBILE: 3 cards sempre visíveis na tela (3/6 · 2/6 · 1/6) ── */
+    @media (max-width: 767px) {
+      body {
+        height: 100vh;
+        height: 100dvh;              /* acompanha a barra do navegador */
+        min-height: 0;
+        padding: .75rem;
+        align-items: stretch;
+        overflow: hidden;
+      }
+
+      .layout {
+        height: 100%;
+        min-height: 0;
+        gap: .75rem;
+        grid-template-rows: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 1fr);
+      }
+
+      /* os 2 painéis da lateral viram linhas diretas da grade */
+      .sidebar { display: contents; }
+
+      /* card principal: botões fixos embaixo, só o texto do episódio se adapta */
+      .main-card { padding: 1.25rem; gap: .75rem; min-height: 0; border-radius: 28px; }
+      .main-top { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .badge { align-self: flex-start; margin-bottom: .75rem; }
+      .episode-area { flex: 1; min-height: 0; }
+      .episode-title { margin-bottom: 0; }
+      .btn-row { margin-top: 0; gap: .5rem; }
+      .btn { padding: .75rem 1.25rem; }
+
+      /* painéis */
+      .panel { padding: .9rem 1.25rem; min-height: 0; overflow: hidden; }
+      .panel-title { margin-bottom: .25rem; }
+
+      /* histórico com rolagem suave (barra fina em formato de pílula) */
+      .panel-history { display: flex; flex-direction: column; }
+      .history-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: .5rem;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,.3) transparent;
+      }
+      .history-list::-webkit-scrollbar { width: 6px; }
+      .history-list::-webkit-scrollbar-track { background: transparent; }
+      .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.3); border-radius: 9999px; }
+
+      /* total: título à esquerda, contagem à direita */
+      .panel-total { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .panel-total .panel-title { margin: 0; }
+      .total-count { font-size: 1.75rem; white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
@@ -256,7 +301,7 @@
     <div class="bubble-1"></div>
     <div class="bubble-2"></div>
 
-    <div style="position:relative;z-index:1">
+    <div class="main-top" style="position:relative;z-index:1">
       <div class="badge">
         <!-- TV icon -->
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -270,7 +315,7 @@
       </div>
     </div>
 
-    <div style="position:relative;z-index:1">
+    <div class="main-bottom" style="position:relative;z-index:1">
       <div class="btn-row">
         <button class="btn btn-primary" onclick="pickRandom()">
           <!-- Shuffle icon -->
@@ -280,7 +325,7 @@
           </svg>
           SORTEAR PRÓXIMO
         </button>
-        <a id="watchBtn" class="btn btn-secondary" target="_blank" rel="noopener noreferrer" style="display:none">
+        <a id="watchBtn" class="btn btn-secondary" target="_blank" rel="noopener noreferrer" style="visibility:hidden">
           <!-- Film icon -->
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><line x1="7" y1="2" x2="7" y2="22"/>
@@ -296,13 +341,13 @@
 
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="panel" style="flex:1">
+    <div class="panel panel-history" style="flex:1">
       <p class="panel-title">Vistos Recentemente</p>
       <ul class="history-list" id="historyList">
         <li class="empty-history">Nenhum episódio sorteado ainda.</li>
       </ul>
     </div>
-    <div class="panel">
+    <div class="panel panel-total">
       <p class="panel-title">Total na Lista</p>
       <div class="total-count" id="totalCount">
         0 <span>Episódios</span>
@@ -682,11 +727,10 @@ function pickRandom() {
     <h1 class="episode-title">${selected.title}</h1>
   `;
   episodeArea.appendChild(wrapper);
-  fitEpisode();
 
   // Update watch button
   watchBtn.href = selected.link;
-  watchBtn.style.display = 'inline-flex';
+  watchBtn.style.visibility = 'visible';
 
   // Update history (unique titles, max 4)
   history = [selected, ...history];
@@ -698,6 +742,7 @@ function pickRandom() {
   }).slice(0, 4);
 
   renderHistory();
+  fitEpisode();   // depois que o layout já está no lugar final
 }
 
 function renderHistory() {
@@ -722,20 +767,27 @@ function renderHistory() {
 }
 
 // ── Ajuste automático de fonte ──
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
 // Reduz o font-size até o texto caber: em 1 linha (meta) ou em no máximo N linhas (título).
-function fitText(el, maxLines, minPx) {
+// "extra" (opcional) é uma checagem a mais, ex.: caber na altura disponível do card.
+// Retorna true se coube.
+function fitText(el, maxLines, minPx, extra) {
   el.classList.remove('clamped');
+  el.style.webkitLineClamp = '';
+  el.style.lineClamp = '';
   el.style.fontSize = '';                                   // volta ao tamanho máximo definido no CSS
   const maxPx = parseFloat(getComputedStyle(el).fontSize);
 
   const fits = () => {
     if (el.scrollWidth > el.clientWidth + 1) return false;  // estouro horizontal (palavra longa / nowrap)
+    if (extra && !extra()) return false;                    // altura disponível
     if (maxLines === 1) return true;                        // linha única: nowrap já garante a altura
     const lh = parseFloat(getComputedStyle(el).lineHeight);
     return el.scrollHeight <= lh * maxLines + 1;            // altura máxima = N linhas
   };
 
-  if (fits()) return;
+  if (fits()) return true;
 
   let lo = minPx, hi = maxPx;                               // lo = cabe (assumido), hi = não cabe
   while (hi - lo > 0.5) {
@@ -744,16 +796,32 @@ function fitText(el, maxLines, minPx) {
     if (fits()) lo = mid; else hi = mid;
   }
   el.style.fontSize = lo + 'px';
-
-  // Se nem no tamanho mínimo coube, corta com reticências (garante o limite de linhas)
-  if (!fits() && maxLines > 1) el.classList.add('clamped');
+  return fits();
 }
 
 function fitEpisode() {
+  const wrapper = episodeArea.firstElementChild;
   const meta  = episodeArea.querySelector('.episode-meta');
   const title = episodeArea.querySelector('.episode-title');
   if (meta)  fitText(meta, 1, 9);
-  if (title) fitText(title, 3, 18);
+  if (!title) return;
+
+  // No celular o card tem altura fixa: o texto precisa caber no espaço que sobra entre o selo e os botões.
+  const heightOk = () => !isMobile() || wrapper.offsetHeight <= episodeArea.clientHeight + 1;
+  const ok = fitText(title, 3, isMobile() ? 13 : 18, heightOk);
+
+  // Rede de segurança: se nem no tamanho mínimo coube, corta com reticências
+  if (!ok) {
+    const lh = parseFloat(getComputedStyle(title).lineHeight);
+    let lines = 3;
+    if (isMobile()) {
+      const others = wrapper.offsetHeight - title.offsetHeight;
+      lines = Math.max(1, Math.min(3, Math.floor((episodeArea.clientHeight - others) / lh)));
+    }
+    title.style.webkitLineClamp = lines;
+    title.style.lineClamp = lines;
+    title.classList.add('clamped');
+  }
 }
 
 let resizeFrame;
